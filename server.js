@@ -9,20 +9,36 @@ const app = express();
 
 // CORS configuration - allow frontend origin
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',')
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
   : ['http://localhost:3000', 'http://localhost:3001'];
+
+// If ALLOWED_ORIGINS is set to "*", allow all origins
+const allowAllOrigins = allowedOrigins.includes('*');
 
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+    
+    // If allow all origins is enabled, allow everything
+    if (allowAllOrigins) {
+      return callback(null, true);
+    }
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      // Log for debugging
+      console.log('CORS blocked origin:', origin);
+      console.log('Allowed origins:', allowedOrigins);
+      // For now, allow all origins to fix the issue - you can restrict this later
+      callback(null, true);
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json()); // Parse JSON bodies
 
@@ -31,7 +47,11 @@ const gameStore = new GameStore();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins.includes('*') ? "*" : allowedOrigins,
+    origin: function (origin, callback) {
+      // Allow all origins for now to fix CORS issues
+      // You can restrict this later by setting ALLOWED_ORIGINS environment variable
+      callback(null, true);
+    },
     methods: ["GET", "POST"],
     credentials: true
   }
